@@ -3,7 +3,7 @@ const router = express.Router();
 const { asyncHandler } = require('../utils/errorHandler');
 const todoService = require('../services/todoService');
 const validate = require('../middlewares/validate');
-const validateId = require('../middleware/validateId');
+const validateId = require('../middlewares/validateId');
 const { 
   createTodoSchema, 
   updateTodoSchema, 
@@ -28,7 +28,7 @@ router.post('/', validate(createTodoSchema), asyncHandler(async (req, res) => {
   res.status(201).json(newTodo);
 }));
 
-// PUT /todos/reorder - Todo 순서 변경
+// PUT /todos/reorder - 할 일 순서 변경
 router.put('/reorder', validate(reorderTodosSchema), asyncHandler(async (req, res) => {
   const { todos } = req.body;
   await todoService.reorderTodos(todos);

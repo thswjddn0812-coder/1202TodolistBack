@@ -1,54 +1,39 @@
 const prisma = require('../prisma/client');
 const { ValidationError } = require('../utils/errorHandler');
-const getTodoDateString = require('../utils/dateHelper');
 
 class TodoService {
-  /**
-   * Get next order index
-   * @param {string} model 
-   * @param {object} where 
-   * @param {object} tx 
-   */
+  // 1. 헬퍼 함수: 이건 그대로 둠 (내부 로직이라 Joi랑 무관)
   async getNextOrderIndex(model, where = {}, tx = prisma) {
     const maxItem = await tx[model].findFirst({
       where,
       orderBy: { order_index: 'desc' },
     });
-    
     return maxItem ? maxItem.order_index + 1 : 0;
   }
 
-  /**
-   * Get all todos with subtasks
-   * @param {object} where 
-   */
   async getAllTodos(where = {}) {
     return await prisma.todos.findMany({
       where,
       include: {
-        subtasks: {
-          orderBy: { order_index: 'asc' },
-        },
+        subtasks: { orderBy: { order_index: 'asc' } },
       },
       orderBy: { order_index: 'asc' },
     });
   }
 
-  /**
-   * Create a new todo
-   * @param {string} text 
-   * @param {string} date 
-   */
+  // 2. 생성: 날짜 지지고 볶는 로직 싹 사라짐!
+  // Joi가 이미 date를 Date 객체로, 없으면 undefined로 넘겨줌
   async createTodo(text, date) {
-    const todoDate = date ? getTodoDateString(date) : new Date().toISOString().split('T')[0];
+    // date가 없으면 오늘 날짜, 있으면 Joi가 준 Date 객체 그대로 사용
+    const targetDate = date || new Date(); 
 
     return await prisma.$transaction(async (tx) => {
-      const order_index = await this.getNextOrderIndex('todos', { date: new Date(todoDate) }, tx);
+      const order_index = await this.getNextOrderIndex('todos', { date: targetDate }, tx);
 
       return await tx.todos.create({
         data: {
           text,
-          date: new Date(todoDate),
+          date: targetDate, // 훨씬 깔끔하지?
           completed: false,
           order_index,
         },
@@ -57,11 +42,6 @@ class TodoService {
     });
   }
 
-  /**
-   * Update a todo
-   * @param {number} id 
-   * @param {object} data 
-   */
   async updateTodo(id, data) {
     return await prisma.todos.update({
       where: { id },
@@ -70,45 +50,26 @@ class TodoService {
     });
   }
 
-  /**
-   * Delete a todo
-   * @param {number} id 
-   */
   async deleteTodo(id) {
-    await prisma.todos.delete({
-      where: { id },
-    });
+    await prisma.todos.delete({ where: { id } });
   }
 
-  /**
-   * Reorder todos
-   * @param {Array} items 
-   */
+  // 3. 순서 변경: Joi가 id랑 order_index가 '숫자'임을 보장해줬으니 안심하고 실행
   async reorderTodos(items) {
-    if (items.length === 0) return;
-
+    if (!items || items.length === 0) return;
     const cases = items.map(item => `WHEN ${item.id} THEN ${item.order_index}`).join(' ');
     const ids = items.map(item => item.id).join(',');
 
-    // Using raw query for batch update optimization
     await prisma.$executeRawUnsafe(`
-      UPDATE Todos 
+      UPDATE todos 
       SET order_index = CASE id ${cases} END 
       WHERE id IN (${ids})
     `);
   }
 
-  /**
-   * Create a subtask
-   * @param {number} todoId 
-   * @param {string} text 
-   */
   async createSubtask(todoId, text) {
-    // Verify todo exists
     const todo = await prisma.todos.findUnique({ where: { id: todoId } });
-    if (!todo) {
-      throw new ValidationError('Todo not found');
-    }
+    if (!todo) throw new ValidationError('Todo not found');
 
     const order_index = await this.getNextOrderIndex('subtasks', { todo_id: todoId });
 
@@ -122,11 +83,6 @@ class TodoService {
     });
   }
 
-  /**
-   * Update a subtask
-   * @param {number} subtaskId 
-   * @param {object} data 
-   */
   async updateSubtask(subtaskId, data) {
     return await prisma.subtasks.update({
       where: { id: subtaskId },
@@ -134,14 +90,8 @@ class TodoService {
     });
   }
 
-  /**
-   * Delete a subtask
-   * @param {number} subtaskId 
-   */
   async deleteSubtask(subtaskId) {
-    await prisma.subtasks.delete({
-      where: { id: subtaskId },
-    });
+    await prisma.subtasks.delete({ where: { id: subtaskId } });
   }
 }
 

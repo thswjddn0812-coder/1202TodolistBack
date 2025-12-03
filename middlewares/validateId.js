@@ -1,8 +1,8 @@
 const { ValidationError } = require('../utils/errorHandler');
 
 /**
- * Middleware to validate and parse ID parameters
- * @param {string[]} paramNames - List of parameter names to validate (e.g., ['id', 'todoId'])
+ * ID 파라미터 유효성 검사 및 파싱 미들웨어
+ * @param {string[]} paramNames - 검증할 파라미터 이름 목록 (예: ['id', 'todoId'])
  */
 const validateId = (paramNames = ['id']) => {
   return (req, res, next) => {
@@ -13,7 +13,7 @@ const validateId = (paramNames = ['id']) => {
         if (isNaN(parsed)) {
           return next(new ValidationError(`Invalid ${paramName}: must be a number`));
         }
-        // Replace the string param with the parsed integer
+        // 문자열 파라미터를 파싱된 정수로 교체
         req.params[paramName] = parsed;
       }
     }
