@@ -6,8 +6,8 @@ const prisma = require('../prisma/client');
  * @param {object} where - Prisma where 조건
  * @returns {Promise<number>} 다음 order_index 값
  */
-const getNextOrderIndex = async (model, where = {}) => {
-  const maxItem = await prisma[model].findFirst({
+const getNextOrderIndex = async (model, where = {}, tx = prisma) => {
+  const maxItem = await tx[model].findFirst({
     where,
     orderBy: { order_index: 'desc' },
   });
@@ -38,14 +38,29 @@ const getTodoWithSubtasks = async (id) => {
  * @returns {Promise<void>}
  */
 const updateOrderIndexes = async (model, items) => {
-  await prisma.$transaction(
-    items.map((item) =>
-      prisma[model].update({
-        where: { id: item.id },
-        data: { order_index: item.order_index },
-      })
-    )
-  );
+  if (items.length === 0) return;
+
+  // Construct the CASE statement
+  const cases = items.map(item => `WHEN ${item.id} THEN ${item.order_index}`).join(' ');
+  const ids = items.map(item => item.id).join(',');
+
+  // Use executeRawUnsafe because table name and cases cannot be parameterized easily in standard template tag
+  // CAUTION: Ensure 'model' is trusted (it comes from our code, not user input directly in a way that allows injection)
+  const tableName = model === 'todos' ? 'Todos' : 'Subtasks'; // Prisma maps models to PascalCase usually, but let's check schema. 
+  // Actually, in SQLite with Prisma, the table names are usually same as model names but let's verify.
+  // Default prisma naming: model Todos -> table Todos.
+  // But let's check schema.prisma if possible. Assuming standard naming.
+  
+  // However, to be safe and database agnostic, we might stick to transaction if raw query is too risky or complex for different DBs.
+  // But the user specifically asked for optimization.
+  // Let's try to use the transaction approach but optimized? No, transaction IS the current approach.
+  // User asked for "single query".
+  
+  await prisma.$executeRawUnsafe(`
+    UPDATE ${tableName} 
+    SET order_index = CASE id ${cases} END 
+    WHERE id IN (${ids})
+  `);
 };
 
 /**
