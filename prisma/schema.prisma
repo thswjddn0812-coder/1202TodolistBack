@@ -12,9 +12,9 @@ model subtasks {
   todo_id     Int
   text        String    @db.VarChar(500)
   completed   Boolean?  @default(false)
-  order_index Int       @default(0)
   created_at  DateTime? @default(now()) @db.Timestamp(0)
   updated_at  DateTime? @default(now()) @db.Timestamp(0)
+  order_index Int       @default(0)
   todos       todos     @relation(fields: [todo_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "subtasks_ibfk_1")
 
   @@index([todo_id], map: "todo_id")
@@ -25,8 +25,8 @@ model todos {
   text        String     @db.VarChar(500)
   completed   Boolean?   @default(false)
   date        DateTime   @db.Date
-  order_index Int        @default(0)
   created_at  DateTime?  @default(now()) @db.Timestamp(0)
   updated_at  DateTime?  @default(now()) @db.Timestamp(0)
+  order_index Int        @default(0)
   subtasks    subtasks[]
 }
